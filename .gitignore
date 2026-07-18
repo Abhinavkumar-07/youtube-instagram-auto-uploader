@@ -1,0 +1,18 @@
+# Secrets - NEVER commit these
+.env
+client_secret.json
+token.json
+
+# Python environment
+venv/
+__pycache__/
+*.pyc
+
+# Runtime state (regenerated automatically, no need to track)
+temp_downloads/
+processed_log.json
+publish_queue.json
+
+# OS/editor junk
+.DS_Store
+.vscode/
