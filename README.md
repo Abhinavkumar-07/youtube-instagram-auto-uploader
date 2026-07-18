@@ -1,7 +1,7 @@
 # Drive → YouTube + Instagram Auto-Publish Pipeline
 
 Podcast clips sit in a Google Drive folder. This pipeline picks them one at a
-time, generates title/description/tags/caption with Claude, and publishes to
+time, generates title/description/tags/caption with Groq, and publishes to
 **YouTube (unlisted → public)** and **Instagram Reels** at the same moment,
 twice a day.
 
@@ -77,7 +77,7 @@ python oauth_setup.py
 
 Copy `.env.example` to `.env` and fill in:
 - `DRIVE_FOLDER_ID`
-- `ANTHROPIC_API_KEY`
+- `GROQ_API_KEY`
 - `SLOT_A_TIME` / `SLOT_B_TIME` (defaults already set)
 - `META_ACCESS_TOKEN` / `IG_BUSINESS_ACCOUNT_ID`
 
@@ -98,16 +98,47 @@ Then keep this running on a schedule so queued videos actually go live:
 python publish_scheduled.py
 ```
 
-## Automating with Windows Task Scheduler
+## Automating: runs in the cloud via GitHub Actions (no laptop needed)
 
-Create 3 scheduled tasks, all running `venv\Scripts\python.exe` with "Start in"
-set to this folder:
+This pipeline runs on GitHub's servers on a schedule — your computer can be off.
+Here's what's set up and why:
 
-| Task | Trigger | Arguments |
-|---|---|---|
-| Queue slot A | Daily at 9:30 AM | `upload_unlisted.py --slot A` |
-| Queue slot B | Daily at 1:30 PM | `upload_unlisted.py --slot B` |
-| Publish check | Every 15 min, all day | `publish_scheduled.py` |
+**1. Code lives in a private GitHub repo**, pushed with `git push`. `.gitignore`
+keeps `.env`, `client_secret.json`, and `token.json` out of the repo — those are
+secrets and should never be committed.
+
+**2. Secrets are stored in GitHub → Settings → Secrets and variables → Actions**,
+encrypted, one per value:
+- `DRIVE_FOLDER_ID`
+- `GROQ_API_KEY`
+- `META_ACCESS_TOKEN`
+- `IG_BUSINESS_ACCOUNT_ID`
+- `GOOGLE_CLIENT_SECRET_JSON` — the full contents of your local `client_secret.json`
+- `GOOGLE_TOKEN_JSON` — the full contents of your local `token.json`
+
+**3. `.github/workflows/pipeline.yml`** is the automation itself. On each scheduled
+run, it: checks out the repo → installs dependencies → rebuilds `client_secret.json`
+and `token.json` from the two secrets above → runs the right script for that time
+slot → commits the updated `processed_log.json`/`publish_queue.json` back to the
+repo so the next run remembers what's already been done.
+
+**4. Three schedules** (cron times are UTC, converted from IST):
+- Slot A upload: `0 4 * * *` (9:30 AM IST)
+- Slot B upload: `0 8 * * *` (1:30 PM IST)
+- Publish check: `*/15 * * * *` (every 15 min, all day)
+
+**5. Manual testing**: GitHub repo → Actions tab → "PoddyGo Pipeline" → "Run workflow"
+button — triggers an on-demand run without waiting for the schedule.
+
+### Two expiry dates to track
+
+- **Google refresh token expires in 7 days** unless the OAuth app is moved out of
+  "Testing" mode. Fix: Google Cloud Console → your project → **Google Auth Platform
+  → Audience** → **Publish app**. Do this once, early — it removes the 7-day limit.
+- **Meta access token expires in ~60 days** (mid-September 2026, if generated in
+  July 2026). When it expires, Instagram posting silently fails. Fix: redo the
+  `fb_exchange_token` exchange (see Meta setup section above) and update the
+  `META_ACCESS_TOKEN` secret on GitHub with the new token.
 
 ## Notes
 
