@@ -10,8 +10,6 @@ __pycache__/
 
 # Runtime state (regenerated automatically, no need to track)
 temp_downloads/
-processed_log.json
-publish_queue.json
 
 # OS/editor junk
 .DS_Store
