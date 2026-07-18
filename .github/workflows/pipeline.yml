@@ -1,0 +1,70 @@
+name: PoddyGo Pipeline
+
+on:
+  schedule:
+    # Slot A upload: 9:30 AM IST = 4:00 AM UTC
+    - cron: "0 4 * * *"
+    # Slot B upload: 1:30 PM IST = 8:00 AM UTC
+    - cron: "0 8 * * *"
+    # Publish check: every 15 minutes, all day
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}  # lets you manually trigger a run from the Actions tab for testing
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Reconstruct Google credential files from secrets
+        run: |
+          echo '${{ secrets.GOOGLE_CLIENT_SECRET_JSON }}' > client_secret.json
+          echo '${{ secrets.GOOGLE_TOKEN_JSON }}' > token.json
+
+      - name: Restore state files from repo (if present)
+        run: |
+          touch processed_log.json publish_queue.json
+          [ -s processed_log.json ] || echo '{"processed_file_ids": []}' > processed_log.json
+          [ -s publish_queue.json ] || echo '[]' > publish_queue.json
+
+      - name: Run Slot A upload
+        if: github.event.schedule == '0 4 * * *'
+        env:
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+          IG_BUSINESS_ACCOUNT_ID: ${{ secrets.IG_BUSINESS_ACCOUNT_ID }}
+        run: python upload_unlisted.py --slot A
+
+      - name: Run Slot B upload
+        if: github.event.schedule == '0 8 * * *'
+        env:
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+          IG_BUSINESS_ACCOUNT_ID: ${{ secrets.IG_BUSINESS_ACCOUNT_ID }}
+        run: python upload_unlisted.py --slot B
+
+      - name: Run publish check
+        if: github.event.schedule == '*/15 * * * *' || github.event_name == 'workflow_dispatch'
+        env:
+          META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+          IG_BUSINESS_ACCOUNT_ID: ${{ secrets.IG_BUSINESS_ACCOUNT_ID }}
+        run: python publish_scheduled.py
+
+      - name: Commit updated state back to repo
+        run: |
+          git config user.name "PoddyGo Bot"
+          git config user.email "actions@github.com"
+          git add processed_log.json publish_queue.json
+          git diff --staged --quiet || git commit -m "Update pipeline state [skip ci]"
+          git push

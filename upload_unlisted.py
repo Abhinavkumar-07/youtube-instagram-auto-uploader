@@ -145,7 +145,7 @@ def main():
 
     print(f"Next video: {next_video['name']}")
 
-    print("Generating metadata with Claude...")
+    print("Generating metadata with Groq...")
     metadata = generate_metadata(next_video["name"])
 
     print("Downloading from Drive...")
