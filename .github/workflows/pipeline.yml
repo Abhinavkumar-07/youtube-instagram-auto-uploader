@@ -1,5 +1,8 @@
 name: PoddyGo Pipeline
 
+permissions:
+  contents: write
+
 on:
   schedule:
     # Slot A upload: 9:30 AM IST = 4:00 AM UTC
