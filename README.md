@@ -1,4 +1,4 @@
-# Podcast → YouTube + Instagram Auto-Publisher
+# Podcast/any video → YouTube + Instagram Auto-Publisher
 
 Automatically publishes podcast video clips from a Google Drive folder to
 YouTube and Instagram Reels on a schedule, twice a day, fully free —
