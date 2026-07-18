@@ -1,17 +1,16 @@
-# Podcast/any video → YouTube + Instagram Auto-Publisher
+# YouTube + Instagram Auto-Uploader
 
-Automatically publishes podcast video clips from a Google Drive folder to
-YouTube and Instagram Reels on a schedule, twice a day, fully free —
-using Groq for AI-generated metadata and GitHub Actions for cloud automation.
+Automatically publishes video clips from a Google Drive folder to YouTube and
+Instagram Reels on a schedule, twice a day, fully free — using Groq for
+AI-generated metadata and GitHub Actions for cloud automation.
 
 ---
 
-# Drive → YouTube + Instagram Auto-Publish Pipeline
-
-Podcast clips sit in a Google Drive folder. This pipeline picks them one at a
+Videos sit in a Google Drive folder. This pipeline picks them one at a
 time, generates title/description/tags/caption with Groq, and publishes to
 **YouTube (unlisted → public)** and **Instagram Reels** at the same moment,
-twice a day.
+twice a day. Works for any video content — podcast clips, gaming highlights,
+tutorials, vlogs — just set `CONTENT_DESCRIPTION` in `.env` to match yours.
 
 ## Why two scripts
 

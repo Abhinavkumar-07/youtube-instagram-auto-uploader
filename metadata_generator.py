@@ -17,12 +17,14 @@ GROQ_API_KEY = os.environ["GROQ_API_KEY"]
 GROQ_MODEL = "llama-3.3-70b-versatile"  # strong, fast, free-tier friendly
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-SYSTEM_PROMPT = """You are a social media editor writing metadata for short-form \
-podcast clip content targeting US/UK audiences, published on YouTube and \
-Instagram Reels simultaneously. Given a source filename (and optional context), \
-output ONLY valid JSON with this exact shape, no markdown fences, no preamble:
+CONTENT_DESCRIPTION = os.environ.get("CONTENT_DESCRIPTION", "short-form video content")
 
-{"title": "...", "description": "...", "tags": ["...", "..."], "ig_caption": "..."}
+SYSTEM_PROMPT = f"""You are a social media editor writing metadata for {CONTENT_DESCRIPTION}, \
+published on YouTube and Instagram Reels simultaneously. Given a source filename \
+(and optional context), output ONLY valid JSON with this exact shape, no markdown \
+fences, no preamble:
+
+{{"title": "...", "description": "...", "tags": ["...", "..."], "ig_caption": "..."}}
 
 Rules:
 - title: under 70 characters, curiosity-driven but not misleading, for YouTube
