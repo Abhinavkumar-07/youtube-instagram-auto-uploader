@@ -1,8 +1,13 @@
 # YouTube + Instagram Auto-Uploader
 
+![License](https://img.shields.io/github/license/Abhinavkumar-07/youtube-instagram-auto-uploader)
+![Last Commit](https://img.shields.io/github/last-commit/Abhinavkumar-07/youtube-instagram-auto-uploader)
+![Stars](https://img.shields.io/github/stars/Abhinavkumar-07/youtube-instagram-auto-uploader?style=social)
+
 Automatically publishes video clips from a Google Drive folder to YouTube and
-Instagram Reels on a schedule, twice a day, fully free — using Groq for
-AI-generated metadata and GitHub Actions for cloud automation.
+Instagram Reels on a schedule, twice a day, **completely free** — using Groq
+for AI-generated metadata and GitHub Actions for cloud automation. No paid
+tools, no server to maintain, no laptop that needs to stay on.
 
 ---
 
@@ -11,6 +16,19 @@ time, generates title/description/tags/caption with Groq, and publishes to
 **YouTube (unlisted → public)** and **Instagram Reels** at the same moment,
 twice a day. Works for any video content — podcast clips, gaming highlights,
 tutorials, vlogs — just set `CONTENT_DESCRIPTION` in `.env` to match yours.
+
+## Quick start
+
+1. **Fork this repo**
+2. Get free API access: [Groq](https://console.groq.com/keys) (metadata) +
+   [Google Cloud](https://console.cloud.google.com/) (Drive/YouTube) +
+   [Meta Developers](https://developers.facebook.com/) (Instagram)
+3. Add your credentials as **GitHub Secrets** (Settings → Secrets and
+   variables → Actions) — see [Configure](#5-configure) below for the full list
+4. Enable GitHub Actions on your fork (Actions tab → "I understand, enable")
+5. Drop videos into your Drive folder — the pipeline picks them up automatically
+
+Full setup walkthrough below if you want the details on each step.
 
 ## Why two scripts
 
