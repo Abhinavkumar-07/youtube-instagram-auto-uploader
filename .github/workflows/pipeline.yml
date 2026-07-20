@@ -15,7 +15,14 @@ on:
     - cron: "0 8 * * *"
     # Publish check: every 15 minutes, all day
     - cron: "*/15 * * * *"
-  workflow_dispatch: {}  # lets you manually trigger a run from the Actions tab for testing
+
+  # Manual trigger — lets you test uploads or force a publish check from the Actions tab
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: "Upload slot to run (A or B). Leave blank to run only the publish check."
+        required: false
+        default: ""
 
 jobs:
   run-pipeline:
@@ -28,21 +35,30 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
 
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # Write Google credentials via Python to avoid shell quote-injection
+      # issues that arise when JSON contains single quotes.
       - name: Reconstruct Google credential files from secrets
+        env:
+          GOOGLE_CLIENT_SECRET_JSON: ${{ secrets.GOOGLE_CLIENT_SECRET_JSON }}
+          GOOGLE_TOKEN_JSON: ${{ secrets.GOOGLE_TOKEN_JSON }}
         run: |
-          echo '${{ secrets.GOOGLE_CLIENT_SECRET_JSON }}' > client_secret.json
-          echo '${{ secrets.GOOGLE_TOKEN_JSON }}' > token.json
+          python - <<'EOF'
+          import os, pathlib
+          pathlib.Path("client_secret.json").write_text(os.environ["GOOGLE_CLIENT_SECRET_JSON"])
+          pathlib.Path("token.json").write_text(os.environ["GOOGLE_TOKEN_JSON"])
+          EOF
 
       - name: Restore state files from repo (if present)
         run: |
-          touch processed_log.json publish_queue.json
           [ -s processed_log.json ] || echo '{"processed_file_ids": []}' > processed_log.json
           [ -s publish_queue.json ] || echo '[]' > publish_queue.json
 
+      # --- Scheduled slot A upload ---
       - name: Run Slot A upload
         if: github.event.schedule == '0 4 * * *'
         env:
@@ -52,6 +68,7 @@ jobs:
           IG_BUSINESS_ACCOUNT_ID: ${{ secrets.IG_BUSINESS_ACCOUNT_ID }}
         run: python upload_unlisted.py --slot A
 
+      # --- Scheduled slot B upload ---
       - name: Run Slot B upload
         if: github.event.schedule == '0 8 * * *'
         env:
@@ -61,13 +78,38 @@ jobs:
           IG_BUSINESS_ACCOUNT_ID: ${{ secrets.IG_BUSINESS_ACCOUNT_ID }}
         run: python upload_unlisted.py --slot B
 
+      # --- Manual slot A upload (workflow_dispatch with slot=A) ---
+      - name: Run manual Slot A upload
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.slot == 'A'
+        env:
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+          IG_BUSINESS_ACCOUNT_ID: ${{ secrets.IG_BUSINESS_ACCOUNT_ID }}
+        run: python upload_unlisted.py --slot A
+
+      # --- Manual slot B upload (workflow_dispatch with slot=B) ---
+      - name: Run manual Slot B upload
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.slot == 'B'
+        env:
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+          IG_BUSINESS_ACCOUNT_ID: ${{ secrets.IG_BUSINESS_ACCOUNT_ID }}
+        run: python upload_unlisted.py --slot B
+
+      # --- Publish check (schedule every 15 min OR manual dispatch with no slot) ---
       - name: Run publish check
-        if: github.event.schedule == '*/15 * * * *' || github.event_name == 'workflow_dispatch'
+        if: >
+          github.event.schedule == '*/15 * * * *' ||
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.slot == '')
         env:
           META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
           IG_BUSINESS_ACCOUNT_ID: ${{ secrets.IG_BUSINESS_ACCOUNT_ID }}
         run: python publish_scheduled.py
 
+      # Commit updated state back to repo with retry loop to handle push conflicts
+      # from concurrent runs (the 15-min publish check and a slot upload can overlap).
       - name: Commit updated state back to repo
         run: |
           git config user.name "PoddyGo Bot"
@@ -75,8 +117,8 @@ jobs:
           git add processed_log.json publish_queue.json
           git diff --staged --quiet && exit 0
           git commit -m "Update pipeline state [skip ci]"
-          for i in 1 2 3; do
+          for i in 1 2 3 4 5; do
             git pull --rebase origin main && git push && break
-            echo "Push attempt $i failed, retrying..."
-            sleep 5
+            echo "Push attempt $i failed, retrying in 15s..."
+            sleep 15
           done
