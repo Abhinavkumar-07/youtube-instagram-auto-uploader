@@ -3,6 +3,10 @@ name: PoddyGo Pipeline
 permissions:
   contents: write
 
+concurrency:
+  group: poddygo-pipeline
+  cancel-in-progress: false
+
 on:
   schedule:
     # Slot A upload: 9:30 AM IST = 4:00 AM UTC
@@ -69,5 +73,10 @@ jobs:
           git config user.name "PoddyGo Bot"
           git config user.email "actions@github.com"
           git add processed_log.json publish_queue.json
-          git diff --staged --quiet || git commit -m "Update pipeline state [skip ci]"
-          git push
+          git diff --staged --quiet && exit 0
+          git commit -m "Update pipeline state [skip ci]"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push && break
+            echo "Push attempt $i failed, retrying..."
+            sleep 5
+          done
