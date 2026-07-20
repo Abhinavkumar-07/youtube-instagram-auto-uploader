@@ -1,4 +1,4 @@
-# Secrets - NEVER commit these
+# Secrets — NEVER commit these
 .env
 client_secret.json
 token.json
@@ -7,10 +7,15 @@ token.json
 venv/
 __pycache__/
 *.pyc
+*.pyo
 
 # Runtime state (regenerated automatically, no need to track)
 temp_downloads/
 
+# Logs
+*.log
+
 # OS/editor junk
 .DS_Store
 .vscode/
+*.swp
