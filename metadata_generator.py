@@ -7,11 +7,17 @@ pipeline needs to change as long as generate_metadata() returns the same shape.
 """
 
 import json
+import logging
 import os
+
 import requests
 from dotenv import load_dotenv
 
+from utils import retry_on_transient
+
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 GROQ_API_KEY = os.environ["GROQ_API_KEY"]
 GROQ_MODEL = "llama-3.3-70b-versatile"  # strong, fast, free-tier friendly
@@ -33,13 +39,12 @@ Rules:
 - ig_caption: shorter and punchier than the YouTube description, 1-2 sentences, ends with 5-8 hashtags suited to Instagram Reels discovery
 """
 
+_REQUIRED_KEYS = ("title", "description", "tags", "ig_caption")
 
-def generate_metadata(filename: str, extra_context: str = "") -> dict:
-    """Returns {"title": str, "description": str, "tags": list[str], "ig_caption": str}"""
-    user_prompt = f"Filename: {filename}"
-    if extra_context:
-        user_prompt += f"\nContext: {extra_context}"
 
+@retry_on_transient(max_attempts=4, base_delay=2.0)
+def _call_groq(user_prompt: str) -> str:
+    """Fire a single Groq request and return the raw content string."""
     body = {
         "model": GROQ_MODEL,
         "messages": [
@@ -58,22 +63,50 @@ def generate_metadata(filename: str, extra_context: str = "") -> dict:
             "Content-Type": "application/json",
             "Authorization": f"Bearer {GROQ_API_KEY}",
         },
+        timeout=30,
     )
     if not response.ok:
-        print("Groq API error response:")
-        print(response.text)
+        logger.error("Groq API error %s: %s", response.status_code, response.text)
     response.raise_for_status()
+    return response.json()["choices"][0]["message"]["content"].strip()
 
-    raw = response.json()["choices"][0]["message"]["content"].strip()
+
+def generate_metadata(filename: str, extra_context: str = "") -> dict:
+    """Return {"title": str, "description": str, "tags": list[str], "ig_caption": str}.
+
+    Args:
+        filename: original video filename — used as the primary signal for
+                  title / description generation.
+        extra_context: optional free-text context appended to the prompt
+                       (e.g. episode number, guest name, show notes snippet).
+
+    Raises:
+        ValueError: if the Groq response is missing required keys.
+        requests.HTTPError: on unrecoverable API errors (after retries).
+        json.JSONDecodeError: if the model returns malformed JSON.
+    """
+    user_prompt = f"Filename: {filename}"
+    if extra_context:
+        user_prompt += f"\nContext: {extra_context}"
+
+    raw = _call_groq(user_prompt)
+    # Strip accidental markdown fences the model might add despite instructions
     raw = raw.replace("```json", "").replace("```", "").strip()
 
     data = json.loads(raw)
-    required = ("title", "description", "tags", "ig_caption")
-    assert all(k in data for k in required)
+
+    missing = [k for k in _REQUIRED_KEYS if k not in data]
+    if missing:
+        raise ValueError(
+            f"Groq response is missing required keys: {missing}. "
+            f"Raw response: {raw!r}"
+        )
+
     return data
 
 
 if __name__ == "__main__":
     # quick manual test
+    logging.basicConfig(level=logging.INFO)
     result = generate_metadata("ep12_clip_founder_burnout.mp4")
     print(json.dumps(result, indent=2))
