@@ -19,7 +19,7 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-GROQ_API_KEY = os.environ["GROQ_API_KEY"]
+GROQ_API_KEY = os.environ["GROQ_API_KEY"].strip()
 GROQ_MODEL = "llama-3.3-70b-versatile"  # strong, fast, free-tier friendly
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
