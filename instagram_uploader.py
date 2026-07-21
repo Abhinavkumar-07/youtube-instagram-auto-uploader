@@ -31,9 +31,8 @@ logger = logging.getLogger(__name__)
 GRAPH_API_VERSION = "v21.0"
 BASE_URL = f"https://graph.facebook.com/{GRAPH_API_VERSION}"
 
-IG_USER_ID = os.environ.get("IG_BUSINESS_ACCOUNT_ID", "")
-ACCESS_TOKEN = os.environ.get("META_ACCESS_TOKEN", "")
-
+IG_USER_ID = os.environ.get("IG_BUSINESS_ACCOUNT_ID", "").strip()
+ACCESS_TOKEN = os.environ.get("META_ACCESS_TOKEN", "").strip()
 # Bearer auth header — keeps the token out of POST bodies (and server logs)
 _AUTH_HEADERS = {"Authorization": f"Bearer {ACCESS_TOKEN}"}
 
